@@ -1,42 +1,46 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 const initialStateUser = {
-  userProfiles: [],
+  userProfileList: [],
   isLoading: false,
-  isMoreLoading: false,
+  isLoadMoreLoading: false,
   page: 0,
   userProfile: {
-    authId: 0,
-    userName: "",
+    authid: 0,
+    username: "",
     email: "",
   },
 };
 /**
- * yönetilebilir fetch işlemleri için kullanılır
- * her thunk ismi uniq olmalıdır
+ * yönetilebilir fetch işlemleri için kullanılır. yapılan
+ * api isteğinin durumunu kontrol ederek loading,error v.s.
+ * konularını otomatize eder.
+ * DİKKAT!! her thunk için benzersiz bir isim verin
  */
 export const fetchSaveUserProfile = createAsyncThunk(
   "user/fetchSaveUserProfile",
   async (user) => {
-    fetch("http://34.69.208.110:9092/v1/api/user/newcreateuser", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "Accept-Encoding": "br;q=1.0, gzip;q=0.8, *;q=0.1",
-      },
-      body: JSON.stringify(user),
-    })
-      .then((data) => {
-        setPage(0);
-        getAllUsers(0);
-      })
-      .catch((err) => console.log("something went wrong ", err));
+    const result = await fetch(
+      "http://34.69.208.110:9092/v1/api/user/newcreateuser",
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Accept-Encoding": "br;q=1.0, gzip;q=0.8, *;q=0.1",
+        },
+        body: JSON.stringify(user),
+      }
+    )
+      .then()
+      .catch((err) => console.log("hata oldu....: ", err));
+    return result;
   }
 );
+
 export const fetchGetAllUsers = createAsyncThunk(
   "user/fetchGetAllUsers",
-  async () => {
+  async (currentPage, thunkAPI) => {
     const result = await fetch(
       `http://34.69.208.110:9092/v1/api/user/findallslice?currentPage=${currentPage}&pageSize=8&sortParameter=id&direction=desc`
     )
@@ -45,23 +49,33 @@ export const fetchGetAllUsers = createAsyncThunk(
     return result;
   }
 );
+
 const userSlice = createSlice({
   name: "user",
   initialState: initialStateUser,
+  /**
+   * Daha çok elle müdehale edeceğini kodlamalar için
+   * kullanılan methodlardır.
+   */
   reducers: {
     /**
-     * buradaki state en başta tanımladığımız
-     * initial state e atadığımz değerleri değiştirmek için kullanılır.
-     * Action, buraya dışarıdan girilecek dataları tanımlar
+     * Burada state, yukarıda yazıdğımız  initialState
+     * kavramını ifade eder. içindeki değerleri
+     * değiştirmek için kullanılır.
+     * Action, bu method a dışarıdan girilen dataları
+     * ifade eder.
      */
     nextPage: (state) => {
       state.page = state.page + 1;
     },
-    setAuthId: (state, action) => {
-      state.userProfile = { ...state.userProfile, authId: action.payload };
+    resetPage: (state) => {
+      state.page = 0;
     },
-    setUserName: (state, action) => {
-      state.userProfile = { ...state.userProfile, userName: action.payload };
+    setAuthId: (state, action) => {
+      state.userProfile = { ...state.userProfile, authid: action.payload };
+    },
+    setUsername: (state, action) => {
+      state.userProfile = { ...state.userProfile, username: action.payload };
     },
     setEmail: (state, action) => {
       state.userProfile = { ...state.userProfile, email: action.payload };
@@ -80,18 +94,30 @@ const userSlice = createSlice({
     build.addCase(fetchSaveUserProfile.rejected, (state, action) => {
       state.isLoading = false;
     });
+
     build.addCase(fetchGetAllUsers.pending, (state, action) => {
-      state.isLoading = false;
+      state.isLoading = true;
     });
     build.addCase(fetchGetAllUsers.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.userProfileList = action.payload.content;
+      if (state.page === 0) state.userProfileList = action.payload.content;
+      else
+        state.userProfileList = state.userProfileList = [
+          ...state.userProfileList,
+          ...action.payload.content,
+        ];
     });
     build.addCase(fetchGetAllUsers.rejected, (state, action) => {
       state.isLoading = false;
     });
   },
 });
-export const { nextPage, setAuthId, setUserName, setEmail, setUserProfile } =
-  userSlice.actions;
+export const {
+  nextPage,
+  setAuthId,
+  setUsername,
+  setEmail,
+  setUserProfile,
+  resetPage,
+} = userSlice.actions;
 export default userSlice.reducer;
